@@ -1,1 +1,27 @@
-donne moi ce que je dois coller :epuis la racine du repo (vérifie bien que tu es à la racine, pas dans un dossier), «+» > «Create new file». Dans le champ nom, tape EN UNE SEULE FOIS : .github/workflows/scan.yml — vérifie juste au-dessus du champ que le fil d'Ariane affiche «btmm-fibo-scanner / .github / workflows /» (chaque dossier une seule fois). Colle le contenu du workflow (donné plus haut dans la conversation, le bloc YAML qui commence par «name: BTMM Fibo 61.8 Scanner»). Clique «Commit changes».
+name: Scanner Fibo 61.8%
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du repo
+        uses: actions/checkout@v4
+
+      - name: Installer Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Installer les dépendances
+        run: pip install -r requirements.txt
+
+      - name: Lancer le scanner
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python fibo_scanner.py
