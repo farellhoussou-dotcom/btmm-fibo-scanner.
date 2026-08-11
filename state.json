@@ -4,7 +4,7 @@
   "USDJPY": false,
   "USDCHF": false,
   "AUDUSD": false,
-  "NZDUSD": false,
+  "NZDUSD": true,
   "USDCAD": false,
   "EURGBP": false,
   "EURJPY": false,
