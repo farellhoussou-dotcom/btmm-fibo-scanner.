@@ -1,0 +1,16 @@
+{
+  "EURUSD": true,
+  "GBPUSD": false,
+  "USDJPY": false,
+  "USDCHF": false,
+  "AUDUSD": false,
+  "NZDUSD": false,
+  "USDCAD": false,
+  "EURGBP": false,
+  "EURJPY": false,
+  "GBPJPY": false,
+  "GBPCHF": false,
+  "GBPCAD": true,
+  "EURCHF": true,
+  "AUDJPY": false
+}
