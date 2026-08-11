@@ -1,352 +1,260 @@
-"""
-Scanner Fibonacci 61.8% multi-paires.
+//+------------------------------------------------------------------+
+//|            BB_MeanReversion_Signal.mq4                           |
+//|                                                                    |
+//| INDICATEUR (pas de trading auto). Scanne jusqu'a 20 paires et     |
+//| envoie une alerte (fenetre MT4 + notification push + Telegram)    |
+//| des qu'une paire declenche un signal de mean-reversion sur les    |
+//| Bollinger Bands.                                                  |
+//|                                                                    |
+//| Parametres issus du backtest GBPUSD H4 2020-2022 :                |
+//|   BB Period = 15, Deviation = 2.5, retour a la moyenne a 0.3 std  |
+//|                                                                    |
+//| Sur le graphique ou il est attache, il dessine aussi les bandes   |
+//| de Bollinger pour reference visuelle.                             |
+//|                                                                    |
+//| Les SL/TP/Lot affiches dans l'alerte sont des SUGGESTIONS          |
+//| calculees pour info (risque plafonne a InpMaxRiskUSD) -- aucun    |
+//| ordre n'est jamais envoye par ce script.                          |
+//+------------------------------------------------------------------+
+#property strict
+#property copyright "Custom Indicator"
+#property version   "1.00"
+#property indicator_chart_window
+#property indicator_buffers 3
+#property indicator_color1 clrDodgerBlue   // upper band
+#property indicator_color2 clrGray         // middle band
+#property indicator_color3 clrDodgerBlue   // lower band
 
-Pour chaque paire :
-  - Point A = le plus bas des DAYS_LOOKBACK derniers jours (D1)
-  - Point B = le plus haut des DAYS_LOOKBACK derniers jours (D1)
-  - Le sens (haussier/baissier) est donne par lequel des deux (haut ou bas)
-    s'est forme le plus RECEMMENT chronologiquement.
-  - Entree = niveau 61.8% = A * 0.618 + B * 0.382
-  - Stop Loss = niveau 100% = point A
-  - Lot = calcule pour que la perte au SL soit plafonnee a RISK_USD
-  - "Tester le niveau" = la bougie M15 en cours touche ce niveau
-    (avec une tolerance en pips), SAUF si une annonce economique a fort
-    impact est en cours sur l'une des devises de la paire (fenetre de
-    blackout avant/apres, configurable) -> dans ce cas le signal est ignore.
+//--------------------------- INPUTS ----------------------------------
 
-Une alerte (Telegram + ntfy) est envoyee uniquement au moment ou une paire
-PASSE de "pas en test" a "en test" (pas de spam a chaque execution).
+input string InpSymbols =
+   "EURUSD,GBPUSD,USDJPY,USDCHF,USDCAD,AUDUSD,NZDUSD,EURGBP,EURJPY,EURCHF,"
+   "EURCAD,EURAUD,EURNZD,GBPJPY,GBPCHF,GBPCAD,GBPAUD,GBPNZD,AUDJPY,CHFJPY";
+   // 20 paires par defaut. Adapte les noms si ton broker ajoute un suffixe.
 
-Donnees de prix : Yahoo Finance (gratuit, sans cle API), via yfinance.
-Calendrier economique : Forex Factory (gratuit, sans cle API).
-"""
+input ENUM_TIMEFRAMES InpTimeframe   = PERIOD_H4;  // Timeframe du signal
+input int    InpBBPeriod             = 15;         // Periode Bollinger
+input double InpBBDeviation          = 2.5;        // Deviation Bollinger
+input double InpExitZ                = 0.3;        // Seuil de retour a la moyenne (info, affiche dans l'alerte)
 
-import os
-import sys
-import json
-from datetime import datetime, timedelta, timezone
+input int    InpScanIntervalSec      = 30;         // Frequence de scan (secondes)
+input int    InpMaxSpreadPips        = 4;          // Ignore le signal si spread > ce seuil
 
-import requests
-import yfinance as yf
+input double InpSuggestedRiskUSD     = 140.0;      // Risque $ utilise pour calculer le lot SUGGERE (info only)
+input int    InpSuggestedSL_Pips     = 40;         // SL suggere en pips (info only)
+input double InpSuggestedRR          = 1.5;        // Ratio TP/SL suggere (info only)
 
-# --- Paires surveillees (nom affiche -> ticker Yahoo Finance) -------------
-PAIRS = {
-    "EURUSD": "EURUSD=X",
-    "GBPUSD": "GBPUSD=X",
-    "USDJPY": "USDJPY=X",
-    "USDCHF": "USDCHF=X",
-    "AUDUSD": "AUDUSD=X",
-    "NZDUSD": "NZDUSD=X",
-    "USDCAD": "USDCAD=X",
-    "EURGBP": "EURGBP=X",
-    "EURJPY": "EURJPY=X",
-    "GBPJPY": "GBPJPY=X",
-    "GBPCHF": "GBPCHF=X",
-    "GBPCAD": "GBPCAD=X",
-    "EURCHF": "EURCHF=X",
-    "AUDJPY": "AUDJPY=X",
-    "XAUUSD": "XAUUSD=X",
+input bool   InpUseTelegram          = true;
+input string InpTelegramToken        = "";
+input string InpTelegramChatID       = "";
+input bool   InpUsePushNotification  = false;      // Notification push MT4 mobile (necessite MetaQuotes ID configure dans Options)
+input bool   InpUsePopupAlert        = true;       // Alert() fenetre popup MT4
+
+//--------------------------- BUFFERS ----------------------------------
+
+double BufUpper[];
+double BufMid[];
+double BufLower[];
+
+//--------------------------- GLOBALS ----------------------------------
+
+string   g_symbols[];
+int      g_totalSymbols = 0;
+datetime g_lastAlertedBarTime[]; // dernier bar deja alerte, par symbole (evite les doublons)
+
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   SetIndexBuffer(0, BufUpper); SetIndexStyle(0, DRAW_LINE);
+   SetIndexBuffer(1, BufMid);   SetIndexStyle(1, DRAW_LINE);
+   SetIndexBuffer(2, BufLower); SetIndexStyle(2, DRAW_LINE);
+   IndicatorShortName("BB MeanRev Signal (" + IntegerToString(InpBBPeriod) + "," + DoubleToString(InpBBDeviation,1) + ")");
+
+   g_totalSymbols = StringSplit(InpSymbols, ',', g_symbols);
+   ArrayResize(g_lastAlertedBarTime, g_totalSymbols);
+   for(int i=0; i<g_totalSymbols; i++)
+   {
+      StringTrimLeft(g_symbols[i]);
+      StringTrimRight(g_symbols[i]);
+      SymbolSelect(g_symbols[i], true);
+      g_lastAlertedBarTime[i] = 0;
+   }
+
+   EventSetTimer(InpScanIntervalSec);
+
+   Print("BB_MeanReversion_Signal actif : scan de ", g_totalSymbols, " paires toutes les ", InpScanIntervalSec, "s sur ", EnumToString(InpTimeframe));
+   if(InpUseTelegram)
+      SendTelegramMessage("Indicateur de signaux demarre : " + IntegerToString(g_totalSymbols) + " paires, scan toutes les " + IntegerToString(InpScanIntervalSec) + "s.");
+
+   return(INIT_SUCCEEDED);
 }
 
-# --- Parametres generaux (modifiables via variables d'environnement) ------
-DAYS_LOOKBACK = int(os.environ.get("DAYS_LOOKBACK", "2"))
-TOLERANCE_PIPS = float(os.environ.get("TOLERANCE_PIPS", "3.0"))
-STATE_FILE = "state.json"
-
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
-NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "")
-
-# --- Gestion du risque -----------------------------------------------------
-RISK_USD = float(os.environ.get("RISK_USD", "140"))
-
-# --- Filtre d'annonces economiques -----------------------------------------
-USE_NEWS_FILTER = os.environ.get("USE_NEWS_FILTER", "true").lower() == "true"
-NEWS_IMPACT_FILTER = set(x.strip() for x in os.environ.get("NEWS_IMPACT_FILTER", "High").split(","))
-BLACKOUT_BEFORE_MIN = int(os.environ.get("BLACKOUT_BEFORE_MIN", "15"))
-BLACKOUT_AFTER_MIN = int(os.environ.get("BLACKOUT_AFTER_MIN", "15"))
-CALENDAR_URL = os.environ.get("CALENDAR_URL", "https://nfs.faireconomy.media/ff_calendar_thisweek.json")
-
-
-def pip_size(name: str) -> float:
-    """Taille d'un pip selon le type de paire."""
-    if "JPY" in name:
-        return 0.01
-    if name == "XAUUSD":
-        return 0.1
-    return 0.0001
-
-
-def get_daily_high_low(ticker: str, days: int):
-    """Retourne (high_val, high_date, low_val, low_date) sur les `days`
-    derniers jours cloturees (exclut la bougie du jour en cours, potentiellement
-    incomplete)."""
-    data = yf.Ticker(ticker).history(period=f"{days + 5}d", interval="1d")
-    if data.empty or len(data) < days + 1:
-        return None
-
-    completed = data.iloc[:-1]  # on retire la derniere ligne (jour en cours)
-    recent = completed.tail(days)
-    if recent.empty:
-        return None
-
-    high_val = float(recent["High"].max())
-    high_date = recent["High"].idxmax()
-    low_val = float(recent["Low"].min())
-    low_date = recent["Low"].idxmin()
-    return high_val, high_date, low_val, low_date
-
-
-def get_current_m15(ticker: str):
-    """Retourne (high, low) de la derniere bougie M15 disponible."""
-    data = yf.Ticker(ticker).history(period="2d", interval="15m")
-    if data.empty:
-        return None
-    last = data.iloc[-1]
-    return float(last["High"]), float(last["Low"])
-
-
-def compute_level(high_val, high_date, low_val, low_date):
-    """Calcule le niveau 61.8% (entree), le SL (niveau 100% = point A) et
-    le sens du mouvement."""
-    if low_date > high_date:
-        # le creux est plus recent -> mouvement baissier menant a ce creux
-        A, B = high_val, low_val
-        bullish = False
-    else:
-        # le sommet est plus recent -> mouvement haussier menant a ce sommet
-        A, B = low_val, high_val
-        bullish = True
-
-    entry = A * 0.618 + B * 0.382
-    sl = A
-    return entry, sl, bullish
-
-
-_quote_to_usd_cache = {}
-
-
-def get_quote_to_usd(ccy: str):
-    """Retourne combien vaut 1 unite de `ccy` en USD (avec cache pour eviter
-    les appels repetes dans la meme execution)."""
-    if ccy == "USD":
-        return 1.0
-    if ccy in _quote_to_usd_cache:
-        return _quote_to_usd_cache[ccy]
-
-    rate = None
-    try:
-        d = yf.Ticker(f"{ccy}USD=X").history(period="5d")
-        if not d.empty:
-            rate = float(d["Close"].iloc[-1])
-    except Exception:
-        pass
-
-    if rate is None:
-        try:
-            d = yf.Ticker(f"USD{ccy}=X").history(period="5d")
-            if not d.empty:
-                inv = float(d["Close"].iloc[-1])
-                if inv > 0:
-                    rate = 1.0 / inv
-        except Exception:
-            pass
-
-    _quote_to_usd_cache[ccy] = rate
-    return rate
-
-
-def get_pip_value_per_lot(name: str):
-    """Valeur en USD d'un mouvement d'un pip, pour 1.0 lot standard
-    (100 000 unites, ou 100 onces pour l'or)."""
-    contract_size = 100 if name == "XAUUSD" else 100000
-    pip = pip_size(name)
-    quote_ccy = "USD" if name == "XAUUSD" else name[3:6]
-
-    value_in_quote = pip * contract_size
-
-    if quote_ccy == "USD":
-        return value_in_quote
-
-    q2usd = get_quote_to_usd(quote_ccy)
-    if q2usd is None:
-        return None
-    return value_in_quote * q2usd
-
-
-def calc_lot(entry: float, sl: float, risk_usd: float, name: str):
-    """Calcule le lot pour que la perte au SL soit plafonnee a risk_usd.
-    Arrondi vers le bas au pas de 0.01, jamais au-dessus du risque cible."""
-    distance = abs(entry - sl)
-    if distance <= 0:
-        return None
-
-    pip = pip_size(name)
-    distance_pips = distance / pip
-
-    pip_value = get_pip_value_per_lot(name)
-    if not pip_value or pip_value <= 0:
-        return None
-
-    raw_lot = risk_usd / (distance_pips * pip_value)
-
-    lot = int(raw_lot * 100) / 100.0  # arrondi vers le bas au 0.01
-    if lot < 0.01:
-        return None  # risque trop faible pour atteindre le lot minimum
-    return lot
-
-
-def fetch_calendar():
-    """Telecharge et parse le calendrier economique. Retourne une liste de
-    tuples (datetime_utc, country, impact)."""
-    events = []
-    try:
-        resp = requests.get(CALENDAR_URL, timeout=15)
-        data = resp.json()
-    except Exception as e:
-        print(f"Erreur telechargement calendrier: {e}", file=sys.stderr)
-        return events
-
-    for item in data:
-        try:
-            country = item.get("country", "")
-            impact = item.get("impact", "")
-            date_str = item.get("date", "")
-            if not country or not date_str:
-                continue
-            dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
-            dt_utc = dt.astimezone(timezone.utc)
-            events.append((dt_utc, country, impact))
-        except Exception:
-            continue
-
-    print(f"Calendrier economique charge : {len(events)} evenements.")
-    return events
-
-
-def is_news_blackout(name: str, now_utc: datetime, events: list):
-    """Verifie si une annonce a fort impact touchant cette paire est dans sa
-    fenetre de blackout (avant/apres). Retourne (bool, event_or_None)."""
-    if not USE_NEWS_FILTER or not events:
-        return False, None
-
-    currencies = {"USD"} if name == "XAUUSD" else {name[:3], name[3:6]}
-
-    for dt_utc, country, impact in events:
-        if impact not in NEWS_IMPACT_FILTER:
-            continue
-        if country not in currencies:
-            continue
-        window_start = dt_utc - timedelta(minutes=BLACKOUT_BEFORE_MIN)
-        window_end = dt_utc + timedelta(minutes=BLACKOUT_AFTER_MIN)
-        if window_start <= now_utc <= window_end:
-            return True, dt_utc
-
-    return False, None
-
-
-def send_telegram(text: str):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print("ATTENTION: TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID manquants, alerte non envoyee.", file=sys.stderr)
-        return
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    try:
-        resp = requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": text}, timeout=15)
-        if resp.status_code != 200:
-            print(f"Erreur Telegram ({resp.status_code}): {resp.text}", file=sys.stderr)
-    except Exception as e:
-        print(f"Erreur envoi Telegram: {e}", file=sys.stderr)
-
-
-def send_ntfy(text: str, title: str = "BTMM Fibo Scanner"):
-    if not NTFY_TOPIC:
-        print("ATTENTION: NTFY_TOPIC manquant, alerte ntfy non envoyee.", file=sys.stderr)
-        return
-    url = f"https://ntfy.sh/{NTFY_TOPIC}"
-    try:
-        resp = requests.post(
-            url,
-            data=text.encode("utf-8"),
-            headers={"Title": title, "Priority": "high", "Tags": "chart_with_upwards_trend"},
-            timeout=15,
-        )
-        if resp.status_code != 200:
-            print(f"Erreur ntfy ({resp.status_code}): {resp.text}", file=sys.stderr)
-    except Exception as e:
-        print(f"Erreur envoi ntfy: {e}", file=sys.stderr)
-
-
-def load_state() -> dict:
-    if os.path.exists(STATE_FILE):
-        try:
-            with open(STATE_FILE) as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
-
-
-def save_state(state: dict):
-    with open(STATE_FILE, "w") as f:
-        json.dump(state, f, indent=2, default=str)
-
-
-def main():
-    state = load_state()
-    new_state = {}
-    alerts = []
-
-    now_utc = datetime.now(timezone.utc)
-    events = fetch_calendar() if USE_NEWS_FILTER else []
-
-    for name, ticker in PAIRS.items():
-        try:
-            daily = get_daily_high_low(ticker, DAYS_LOOKBACK)
-            m15 = get_current_m15(ticker)
-            if daily is None or m15 is None:
-                print(f"{name}: donnees insuffisantes, ignore.")
-                continue
-
-            high_val, high_date, low_val, low_date = daily
-            entry, sl, bullish = compute_level(high_val, high_date, low_val, low_date)
-            cur_high, cur_low = m15
-
-            tol = TOLERANCE_PIPS * pip_size(name)
-            price_at_level = (cur_low - tol) <= entry <= (cur_high + tol)
-
-            news_block, news_time = is_news_blackout(name, now_utc, events)
-            testing = price_at_level and not news_block
-
-            new_state[name] = bool(testing)
-            was_testing = bool(state.get(name, False))
-
-            sens = "Haussier (ACHAT)" if bullish else "Baissier (VENTE)"
-            lot = calc_lot(entry, sl, RISK_USD, name)
-            lot_str = f"{lot:.2f}" if lot else "N/A (risque trop faible)"
-
-            news_tag = " [NEWS - ignore]" if news_block else ""
-            print(f"{name}: entree={entry:.5f} sl={sl:.5f} lot={lot_str} sens={sens} testing={testing}{news_tag}")
-
-            if testing and not was_testing:
-                alerts.append(
-                    f"{name} | Signal BTMM - Test du niveau 61.8%\n"
-                    f"Sens: {sens}\n"
-                    f"Entree (61.8%): {entry:.5f}\n"
-                    f"Stop Loss (100%): {sl:.5f}\n"
-                    f"Lot (risque {RISK_USD:.0f}$): {lot_str}\n"
-                    f"Range utilisee: {DAYS_LOOKBACK} derniers jours\n"
-                    f"Heure: {now_utc.strftime('%Y-%m-%d %H:%M UTC')}"
-                )
-        except Exception as e:
-            print(f"Erreur sur {name}: {e}", file=sys.stderr)
-
-    for alert in alerts:
-        send_telegram(alert)
-        send_ntfy(alert)
-        print("ALERTE ENVOYEE:\n" + alert)
-
-    save_state(new_state)
-
-
-if __name__ == "__main__":
-    main()
+//+------------------------------------------------------------------+
+void OnDeinit(const int reason)
+{
+   EventKillTimer();
+}
+
+//+------------------------------------------------------------------+
+//| Dessine les bandes sur le graphique courant (reference visuelle) |
+//+------------------------------------------------------------------+
+int OnCalculate(const int rates_total, const int prev_calculated, const datetime &time[],
+                 const double &open[], const double &high[], const double &low[], const double &close[],
+                 const long &tick_volume[], const long &volume[], const int &spread[])
+{
+   int start = (prev_calculated > 0) ? prev_calculated - 1 : InpBBPeriod;
+   for(int i=start; i<rates_total; i++)
+   {
+      int shift = rates_total - 1 - i;
+      BufUpper[i] = iBands(Symbol(), InpTimeframe, InpBBPeriod, InpBBDeviation, 0, PRICE_CLOSE, MODE_UPPER, shift);
+      BufMid[i]   = iBands(Symbol(), InpTimeframe, InpBBPeriod, InpBBDeviation, 0, PRICE_CLOSE, MODE_MAIN,  shift);
+      BufLower[i] = iBands(Symbol(), InpTimeframe, InpBBPeriod, InpBBDeviation, 0, PRICE_CLOSE, MODE_LOWER, shift);
+   }
+   return(rates_total);
+}
+
+//+------------------------------------------------------------------+
+//| Scan periodique de toutes les paires -> alertes uniquement       |
+//+------------------------------------------------------------------+
+void OnTimer()
+{
+   for(int i=0; i<g_totalSymbols; i++)
+      ScanSymbol(i);
+}
+
+//+------------------------------------------------------------------+
+double PipSize(string sym)
+{
+   int digits = (int)MarketInfo(sym, MODE_DIGITS);
+   double point = MarketInfo(sym, MODE_POINT);
+   if(digits == 3 || digits == 5) return point * 10.0;
+   return point;
+}
+
+//+------------------------------------------------------------------+
+void ScanSymbol(int idx)
+{
+   string sym = g_symbols[idx];
+   if(MarketInfo(sym, MODE_BID) == 0) return; // pas de donnees sur ce symbole
+
+   if(iBars(sym, InpTimeframe) < InpBBPeriod + 5) return;
+
+   datetime bar1Time = iTime(sym, InpTimeframe, 1);
+   if(bar1Time == g_lastAlertedBarTime[idx]) return; // deja traite cette bougie -> pas de doublon
+
+   double closeBar1 = iClose(sym, InpTimeframe, 1);
+   double upper = iBands(sym, InpTimeframe, InpBBPeriod, InpBBDeviation, 0, PRICE_CLOSE, MODE_UPPER, 1);
+   double lower = iBands(sym, InpTimeframe, InpBBPeriod, InpBBDeviation, 0, PRICE_CLOSE, MODE_LOWER, 1);
+   double mid   = iBands(sym, InpTimeframe, InpBBPeriod, InpBBDeviation, 0, PRICE_CLOSE, MODE_MAIN,  1);
+
+   double spreadPips = (MarketInfo(sym, MODE_ASK) - MarketInfo(sym, MODE_BID)) / PipSize(sym);
+
+   string direction = "";
+   if(closeBar1 < lower)      direction = "ACHAT (rebond attendu depuis la bande basse)";
+   else if(closeBar1 > upper) direction = "VENTE (retour attendu depuis la bande haute)";
+   else return; // pas de signal sur cette bougie
+
+   g_lastAlertedBarTime[idx] = bar1Time; // marque cette bougie comme traitee, meme si spread filtre le signal
+
+   if(spreadPips > InpMaxSpreadPips)
+   {
+      Print(sym, " : signal detecte mais spread trop large (", DoubleToString(spreadPips,1), " pips), alerte ignoree.");
+      return;
+   }
+
+   int digits = (int)MarketInfo(sym, MODE_DIGITS);
+   double pip  = PipSize(sym);
+   bool isBuy  = (StringFind(direction, "ACHAT") >= 0);
+   double entryPrice = isBuy ? MarketInfo(sym, MODE_ASK) : MarketInfo(sym, MODE_BID);
+   double suggSL = isBuy ? entryPrice - InpSuggestedSL_Pips*pip : entryPrice + InpSuggestedSL_Pips*pip;
+   double suggTP = isBuy ? entryPrice + InpSuggestedSL_Pips*InpSuggestedRR*pip : entryPrice - InpSuggestedSL_Pips*InpSuggestedRR*pip;
+   double suggLot = SuggestedLot(sym, InpSuggestedSL_Pips);
+
+   string msg = "SIGNAL " + sym + " (" + EnumToString(InpTimeframe) + ")\n"
+              + direction + "\n"
+              + "Prix: " + DoubleToString(entryPrice, digits) + "\n"
+              + "Bande haute/basse: " + DoubleToString(upper,digits) + " / " + DoubleToString(lower,digits) + "\n"
+              + "Moyenne (cible retour): " + DoubleToString(mid, digits) + "\n"
+              + "--- suggestions (aucun ordre envoye) ---\n"
+              + "SL suggere: " + DoubleToString(suggSL, digits) + " (" + IntegerToString(InpSuggestedSL_Pips) + " pips)\n"
+              + "TP suggere: " + DoubleToString(suggTP, digits) + "\n"
+              + "Lot suggere pour risque $" + DoubleToString(InpSuggestedRiskUSD,0) + ": " + DoubleToString(suggLot, 2);
+
+   Print(msg);
+   if(InpUsePopupAlert) Alert(msg);
+   if(InpUsePushNotification) SendNotification(StringSubstr(msg, 0, 255)); // push MT4 limite a 255 caracteres
+   if(InpUseTelegram) SendTelegramMessage(msg);
+}
+
+//+------------------------------------------------------------------+
+//| Calcule un lot suggere pour un risque donne (INFO ONLY)          |
+//+------------------------------------------------------------------+
+double SuggestedLot(string sym, int slPips)
+{
+   double tickValue = MarketInfo(sym, MODE_TICKVALUE);
+   double tickSize  = MarketInfo(sym, MODE_TICKSIZE);
+   if(tickValue <= 0 || tickSize <= 0) return 0.0;
+
+   double slPriceDistance = slPips * PipSize(sym);
+   double slTicks = slPriceDistance / tickSize;
+   double moneyPerLot = slTicks * tickValue;
+   if(moneyPerLot <= 0) return 0.0;
+
+   double lots = InpSuggestedRiskUSD / moneyPerLot;
+   double minLot  = MarketInfo(sym, MODE_MINLOT);
+   double maxLot  = MarketInfo(sym, MODE_MAXLOT);
+   double lotStep = MarketInfo(sym, MODE_LOTSTEP);
+
+   lots = MathFloor(lots / lotStep) * lotStep;
+   if(lots < minLot) lots = minLot; // purement indicatif ici, pas d'ordre reel
+   if(lots > maxLot) lots = maxLot;
+
+   return NormalizeDouble(lots, 2);
+}
+
+//+------------------------------------------------------------------+
+string UrlEncode(string text)
+{
+   string result = "";
+   int len = StringLen(text);
+   for(int i=0; i<len; i++)
+   {
+      ushort ch = StringGetCharacter(text, i);
+      if((ch>='A'&&ch<='Z')||(ch>='a'&&ch<='z')||(ch>='0'&&ch<='9'))
+         result += ShortToString(ch);
+      else if(ch==' ')
+         result += "%20";
+      else if(ch=='\n')
+         result += "%0A";
+      else
+         result += StringFormat("%%%02X", ch);
+   }
+   return result;
+}
+
+//+------------------------------------------------------------------+
+int SendTelegramMessage(string message)
+{
+   if(!InpUseTelegram || InpTelegramToken=="" || InpTelegramChatID=="") return -1;
+
+   string url = "https://api.telegram.org/bot" + InpTelegramToken + "/sendMessage";
+   string headers = "Content-Type: application/x-www-form-urlencoded\r\n";
+   string postData = "chat_id=" + InpTelegramChatID + "&text=" + UrlEncode(message);
+
+   char post[];
+   StringToCharArray(postData, post, 0, StringLen(postData));
+   char result[];
+   string resultHeaders;
+
+   ResetLastError();
+   int res = WebRequest("POST", url, headers, 5000, post, result, resultHeaders);
+   if(res == -1)
+   {
+      int err = GetLastError();
+      Print("Erreur Telegram WebRequest: ", err,
+            ". Va dans Outils > Options > Expert Advisors et ajoute 'https://api.telegram.org' aux URL autorisees.");
+      return -1;
+   }
+   return res;
+}
+//+------------------------------------------------------------------+
