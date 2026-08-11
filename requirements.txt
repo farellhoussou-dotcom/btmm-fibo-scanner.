@@ -1,2 +1,19 @@
-yfinance>=0.2.40
-requests>=2.31.0
+# Fichiers compilés MetaTrader (générés automatiquement, à ne pas versionner)
+*.ex4
+*.ex5
+
+# Fichiers de logs / profils MT4
+*.log
+*.htm
+*.hst
+
+# Fichiers de configuration MT4 pouvant contenir des identifiants
+# (token Telegram, chat ID, mots de passe de compte, etc.)
+*.set
+*.ini
+
+# Fichiers temporaires courants
+*.bak
+*.tmp
+Thumbs.db
+.DS_Store
