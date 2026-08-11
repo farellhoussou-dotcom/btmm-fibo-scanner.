@@ -1,44 +1,56 @@
-name: BTMM Fibo 61.8 Scanner
+# BB_MeanReversion_Signal — Indicateur MT4
 
-on:
-  schedule:
-    - cron: '*/30 * * * *'   # toutes les 30 minutes
-  workflow_dispatch: {}       # permet de lancer manuellement depuis l'onglet Actions
+Indicateur MetaTrader 4 (pas de trading automatique) basé sur une stratégie
+Bollinger Bands mean-reversion : période **15**, déviation **2,5σ**, retour
+à la moyenne visé à **0,3σ**. Il scanne jusqu'à **20 paires** en tâche de
+fond et t'alerte (popup MT4 + Telegram + notification push optionnelle) dès
+qu'un signal apparaît. **Aucun ordre n'est jamais envoyé** — les SL/TP/lot
+affichés dans l'alerte sont de simples suggestions calculées pour info.
 
-permissions:
-  contents: write
+⚠️ Ce script est un outil, pas un conseil en investissement. Les paramètres
+viennent d'un backtest sur GBP/USD H4 2020-2022 uniquement (données
+historiques, coûts simplifiés) — leur pertinence sur les 19 autres paires
+n'a pas été validée individuellement.
 
-jobs:
-  scan:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+## Installation
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+1. Dans MT4 : `Fichier` → `Ouvrir le dossier de données`.
+2. Copie `BB_MeanReversion_Signal.mq4` dans `MQL4/Indicators/`.
+3. Redémarre MT4, ou clic droit sur `Indicateurs personnalisés` dans le
+   Navigateur → `Actualiser`.
+4. Compile-le dans MetaEditor (F4 puis F7) et vérifie qu'il n'y a pas d'erreur.
+5. Glisse-le sur n'importe quel graphique — il scanne sa propre liste de 20
+   paires en interne, pas seulement le graphique actif.
 
-      - name: Installer les dependances
-        run: pip install -r requirements.txt
+## Configurer Telegram (obligatoire pour les alertes Telegram)
 
-      - name: Lancer le scanner
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-          DAYS_LOOKBACK: '2'
-          TOLERANCE_PIPS: '3.0'
-          RISK_USD: '140'
-          USE_NEWS_FILTER: 'true'
-          NEWS_IMPACT_FILTER: 'High'
-          BLACKOUT_BEFORE_MIN: '15'
-          BLACKOUT_AFTER_MIN: '15'
-        run: python fibo_scanner.py
+1. `Outils` → `Options` → onglet `Expert Advisors` :
+   - Coche **Autoriser les WebRequest pour les URL listées ci-dessous**
+   - Ajoute exactement : `https://api.telegram.org`
+2. Crée un bot via **@BotFather** sur Telegram (`/newbot`) → note le **token**.
+3. Récupère ton **Chat ID** : parle à **@userinfobot**, ou envoie un message à
+   ton bot puis va sur `https://api.telegram.org/bot<TON_TOKEN>/getUpdates`.
+4. Renseigne `InpTelegramToken` et `InpTelegramChatID` dans les paramètres de
+   l'indicateur.
 
-      - name: Sauvegarder l'etat (evite les alertes en double)
-        run: |
-          git config user.name "btmm-bot"
-          git config user.email "btmm-bot@users.noreply.github.com"
-          git add state.json
-          git diff --cached --quiet || git commit -m "Mise a jour de l'etat du scanner"
-          git push
+## Paramètres principaux
+
+| Paramètre | Défaut | Description |
+|---|---|---|
+| `InpSymbols` | 20 paires majeures/croisées | Liste modifiable ; adapte les noms si ton broker ajoute un suffixe (ex: `EURUSDm`) |
+| `InpTimeframe` | H4 | Timeframe du signal (celui testé en backtest) |
+| `InpBBPeriod` / `InpBBDeviation` | 15 / 2.5 | Paramètres des Bollinger Bands |
+| `InpExitZ` | 0.3 | Distance de retour à la moyenne affichée dans l'alerte |
+| `InpScanIntervalSec` | 30 | Fréquence de scan des 20 paires |
+| `InpMaxSpreadPips` | 4 | Ignore l'alerte si le spread dépasse ce seuil |
+| `InpSuggestedRiskUSD` / `InpSuggestedSL_Pips` / `InpSuggestedRR` | 140 / 40 / 1.5 | Utilisés uniquement pour calculer le SL/TP/lot **suggérés** affichés dans l'alerte |
+| `InpUseTelegram` / `InpTelegramToken` / `InpTelegramChatID` | — | Notifications Telegram |
+| `InpUsePushNotification` | false | Notification push MT4 mobile (nécessite un MetaQuotes ID configuré dans Options) |
+| `InpUsePopupAlert` | true | Fenêtre popup `Alert()` dans MT4 |
+
+## Limite à connaître
+
+MT4 doit rester ouvert (sur ton PC ou un VPS) pour que les signaux soient
+calculés et envoyés — l'indicateur ne fonctionne pas si le terminal est
+complètement fermé. Pour des alertes même PC éteint, il faut faire tourner
+MT4 sur un VPS.
