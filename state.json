@@ -10,7 +10,7 @@
   "EURJPY": false,
   "GBPJPY": false,
   "GBPCHF": false,
-  "GBPCAD": true,
+  "GBPCAD": false,
   "EURCHF": true,
   "AUDJPY": false
 }
