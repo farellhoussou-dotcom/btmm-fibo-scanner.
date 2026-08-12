@@ -1,19 +1,36 @@
-# Fichiers compilés MetaTrader (générés automatiquement, à ne pas versionner)
-*.ex4
-*.ex5
+name: BB Scan
 
-# Fichiers de logs / profils MT4
-*.log
-*.htm
-*.hst
+on:
+  schedule:
+    - cron: '*/15 * * * *'   # toutes les 15 minutes
+  workflow_dispatch:          # bouton "Run workflow" manuel sur GitHub
 
-# Fichiers de configuration MT4 pouvant contenir des identifiants
-# (token Telegram, chat ID, mots de passe de compte, etc.)
-*.set
-*.ini
+permissions:
+  contents: write
 
-# Fichiers temporaires courants
-*.bak
-*.tmp
-Thumbs.db
-.DS_Store
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Installer les dependances
+        run: pip install -r requirements.txt
+
+      - name: Lancer le scan
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python bb_scanner.py
+
+      - name: Sauvegarder l'etat du scanner
+        run: |
+          git config user.name "bb-scanner-bot"
+          git config user.email "actions@github.com"
+          git add state.json
+          git diff --staged --quiet || git commit -m "Mise a jour de l'etat du scanner"
+          git push
