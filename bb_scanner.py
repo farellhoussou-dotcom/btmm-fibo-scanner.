@@ -1,4 +1,4 @@
- """
+"""
 bb_scanner.py
 Scanner "3 Directions" - independant de MT4, concu pour tourner via GitHub
 Actions (cron), pas besoin que ton PC soit allume.
