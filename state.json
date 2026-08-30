@@ -20,7 +20,9 @@
   "EURGBP": {
     "daily": "2026-08-30"
   },
-  "EURJPY": {},
+  "EURJPY": {
+    "daily": "2026-08-30"
+  },
   "EURNZD": {},
   "EURUSD": {
     "asian": "2026-08-30",
