@@ -1,4 +1,4 @@
-"""
+ """
 bb_scanner.py
 Scanner "3 Directions" - independant de MT4, concu pour tourner via GitHub
 Actions (cron), pas besoin que ton PC soit allume.
@@ -66,7 +66,10 @@ def get_daily_data(ticker):
     df = yf.download(ticker, period="30d", interval="1d", progress=False, auto_adjust=False)
     if df.empty:
         return None
-    return df.dropna()
+    df = df.dropna()
+    if df.columns.nlevels > 1:
+        df.columns = df.columns.get_level_values(0)
+    return df
 
 
 def get_hourly_data(ticker):
@@ -74,6 +77,8 @@ def get_hourly_data(ticker):
     if df.empty:
         return None
     df = df.dropna()
+    if df.columns.nlevels > 1:
+        df.columns = df.columns.get_level_values(0)
     if df.index.tz is None:
         df.index = df.index.tz_localize("UTC")
     else:
