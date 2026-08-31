@@ -16,7 +16,9 @@
     "structure": "2026-08-31"
   },
   "EURCAD": {},
-  "EURCHF": {},
+  "EURCHF": {
+    "structure": "2026-08-31"
+  },
   "EURGBP": {
     "daily": "2026-08-31"
   },
