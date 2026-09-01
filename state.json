@@ -40,7 +40,9 @@
     "structure": "2026-09-01"
   },
   "GBPCHF": {},
-  "GBPJPY": {},
+  "GBPJPY": {
+    "daily": "2026-09-01"
+  },
   "GBPNZD": {
     "structure": "2026-09-01"
   },
