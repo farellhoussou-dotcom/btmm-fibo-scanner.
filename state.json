@@ -15,7 +15,9 @@
     "asian": "2026-08-30",
     "structure": "2026-09-01"
   },
-  "EURCAD": {},
+  "EURCAD": {
+    "structure": "2026-09-01"
+  },
   "EURCHF": {
     "structure": "2026-09-01"
   },
@@ -34,7 +36,9 @@
     "asian": "2026-08-30",
     "structure": "2026-09-01"
   },
-  "GBPCAD": {},
+  "GBPCAD": {
+    "structure": "2026-09-01"
+  },
   "GBPCHF": {},
   "GBPJPY": {},
   "GBPNZD": {
@@ -54,5 +58,8 @@
   "USDCHF": {
     "asian": "2026-08-30"
   },
-  "USDJPY": {}
+  "USDJPY": {
+    "daily": "2026-09-01",
+    "structure": "2026-09-01"
+  }
 }
