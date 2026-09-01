@@ -17,7 +17,7 @@
   },
   "EURCAD": {},
   "EURCHF": {
-    "structure": "2026-08-31"
+    "structure": "2026-09-01"
   },
   "EURGBP": {
     "daily": "2026-09-01"
@@ -32,7 +32,7 @@
   },
   "GBPAUD": {
     "asian": "2026-08-30",
-    "structure": "2026-08-31"
+    "structure": "2026-09-01"
   },
   "GBPCAD": {},
   "GBPCHF": {},
