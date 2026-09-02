@@ -13,7 +13,7 @@
   },
   "EURAUD": {
     "asian": "2026-08-30",
-    "daily": "2026-09-01",
+    "daily": "2026-09-02",
     "structure": "2026-09-02"
   },
   "EURCAD": {
@@ -42,7 +42,7 @@
     "structure": "2026-09-02"
   },
   "GBPCHF": {
-    "structure": "2026-09-01"
+    "structure": "2026-09-02"
   },
   "GBPJPY": {
     "daily": "2026-09-01"
@@ -65,7 +65,7 @@
   },
   "USDCHF": {
     "asian": "2026-08-30",
-    "structure": "2026-09-01"
+    "structure": "2026-09-02"
   },
   "USDJPY": {
     "daily": "2026-09-01",
