@@ -1,11 +1,11 @@
 {
   "AUDJPY": {
     "asian": "2026-08-30",
-    "daily": "2026-09-01",
+    "daily": "2026-09-02",
     "structure": "2026-09-01"
   },
   "AUDUSD": {
-    "structure": "2026-09-01"
+    "structure": "2026-09-02"
   },
   "CHFJPY": {
     "daily": "2026-09-01",
@@ -14,10 +14,10 @@
   "EURAUD": {
     "asian": "2026-08-30",
     "daily": "2026-09-01",
-    "structure": "2026-09-01"
+    "structure": "2026-09-02"
   },
   "EURCAD": {
-    "structure": "2026-09-01"
+    "structure": "2026-09-02"
   },
   "EURCHF": {
     "structure": "2026-09-01"
@@ -35,11 +35,11 @@
   },
   "GBPAUD": {
     "asian": "2026-08-30",
-    "daily": "2026-09-01",
+    "daily": "2026-09-02",
     "structure": "2026-09-01"
   },
   "GBPCAD": {
-    "structure": "2026-09-01"
+    "structure": "2026-09-02"
   },
   "GBPCHF": {
     "structure": "2026-09-01"
@@ -48,7 +48,7 @@
     "daily": "2026-09-01"
   },
   "GBPNZD": {
-    "structure": "2026-09-01"
+    "structure": "2026-09-02"
   },
   "GBPUSD": {
     "asian": "2026-08-30",
@@ -56,8 +56,8 @@
   },
   "NZDUSD": {
     "asian": "2026-08-30",
-    "daily": "2026-09-01",
-    "structure": "2026-09-01"
+    "daily": "2026-09-02",
+    "structure": "2026-09-02"
   },
   "USDCAD": {
     "asian": "2026-08-30",
@@ -69,6 +69,6 @@
   },
   "USDJPY": {
     "daily": "2026-09-01",
-    "structure": "2026-09-01"
+    "structure": "2026-09-02"
   }
 }
