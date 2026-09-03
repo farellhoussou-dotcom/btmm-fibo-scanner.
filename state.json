@@ -1,26 +1,26 @@
 {
   "AUDJPY": {
-    "asian": "2026-09-02",
+    "asian": "2026-09-03",
     "daily": "2026-09-02",
-    "structure": "2026-09-02"
+    "structure": "2026-09-03"
   },
   "AUDUSD": {
-    "asian": "2026-09-02",
-    "daily": "2026-09-02",
-    "structure": "2026-09-02"
+    "asian": "2026-09-03",
+    "daily": "2026-09-03",
+    "structure": "2026-09-03"
   },
   "CHFJPY": {
-    "asian": "2026-09-02",
+    "asian": "2026-09-03",
     "daily": "2026-09-01",
-    "structure": "2026-09-02"
+    "structure": "2026-09-03"
   },
   "EURAUD": {
-    "asian": "2026-09-02",
+    "asian": "2026-09-03",
     "daily": "2026-09-02",
-    "structure": "2026-09-02"
+    "structure": "2026-09-03"
   },
   "EURCAD": {
-    "structure": "2026-09-02"
+    "structure": "2026-09-03"
   },
   "EURCHF": {
     "structure": "2026-09-02"
@@ -29,55 +29,55 @@
     "daily": "2026-09-01"
   },
   "EURJPY": {
-    "asian": "2026-09-02",
+    "asian": "2026-09-03",
     "daily": "2026-09-01"
   },
   "EURNZD": {
-    "asian": "2026-09-02",
-    "daily": "2026-09-02",
-    "structure": "2026-09-02"
+    "asian": "2026-09-03",
+    "daily": "2026-09-03",
+    "structure": "2026-09-03"
   },
   "EURUSD": {
     "asian": "2026-08-30",
     "structure": "2026-09-01"
   },
   "GBPAUD": {
-    "asian": "2026-09-02",
+    "asian": "2026-09-03",
     "daily": "2026-09-02",
     "structure": "2026-09-01"
   },
   "GBPCAD": {
-    "structure": "2026-09-02"
+    "structure": "2026-09-03"
   },
   "GBPCHF": {
-    "structure": "2026-09-02"
+    "structure": "2026-09-03"
   },
   "GBPJPY": {
     "daily": "2026-09-02"
   },
   "GBPNZD": {
-    "asian": "2026-09-02",
-    "structure": "2026-09-02"
+    "asian": "2026-09-03",
+    "structure": "2026-09-03"
   },
   "GBPUSD": {
-    "asian": "2026-09-02",
+    "asian": "2026-09-03",
     "structure": "2026-09-01"
   },
   "NZDUSD": {
-    "asian": "2026-09-02",
+    "asian": "2026-09-03",
     "daily": "2026-09-02",
-    "structure": "2026-09-02"
+    "structure": "2026-09-03"
   },
   "USDCAD": {
     "asian": "2026-08-30",
-    "daily": "2026-09-02"
+    "daily": "2026-09-03"
   },
   "USDCHF": {
     "asian": "2026-08-30",
-    "structure": "2026-09-02"
+    "structure": "2026-09-03"
   },
   "USDJPY": {
     "daily": "2026-09-02",
-    "structure": "2026-09-02"
+    "structure": "2026-09-03"
   }
 }
