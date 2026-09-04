@@ -23,7 +23,7 @@
     "structure": "2026-09-04"
   },
   "EURCHF": {
-    "structure": "2026-09-03"
+    "structure": "2026-09-04"
   },
   "EURGBP": {
     "daily": "2026-09-01",
@@ -35,8 +35,8 @@
   },
   "EURNZD": {
     "asian": "2026-09-03",
-    "daily": "2026-09-03",
-    "structure": "2026-09-03"
+    "daily": "2026-09-04",
+    "structure": "2026-09-04"
   },
   "EURUSD": {
     "asian": "2026-08-30",
