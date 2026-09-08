@@ -6,7 +6,7 @@
   },
   "AUDUSD": {
     "asian": "2026-09-03",
-    "daily": "2026-09-05",
+    "daily": "2026-09-08",
     "structure": "2026-09-08"
   },
   "CHFJPY": {
@@ -54,7 +54,7 @@
     "structure": "2026-09-07"
   },
   "GBPCHF": {
-    "structure": "2026-09-04"
+    "structure": "2026-09-08"
   },
   "GBPJPY": {
     "daily": "2026-09-02",
